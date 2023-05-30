@@ -4,6 +4,9 @@
 
 /** To demonstrate code actions associated with Diagnostics problems, this file provides a mock diagnostics entries. */
 
+
+// ! IGNORE THIS FILE, NOT IMPLEMENTED YET -- AT ALL
+
 import * as vscode from 'vscode';
 
 /** Code that is used to associate diagnostic entries with code actions. */

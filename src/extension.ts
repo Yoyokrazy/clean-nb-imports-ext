@@ -3,7 +3,6 @@
  *--------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-// import { subscribeToDocumentChanges, IMPORT_MENTION } from './diagnostics';
 
 export function activate(context: vscode.ExtensionContext) {
 	const notebookSelector: vscode.DocumentSelector = {
@@ -11,25 +10,28 @@ export function activate(context: vscode.ExtensionContext) {
 		language: 'python',
 	};
 
-	// const importDiagnostics = vscode.languages.createDiagnosticCollection('import');
-	// context.subscriptions.push(importDiagnostics);
-	// subscribeToDocumentChanges(context, importDiagnostics);
 
+	// Notebook Level Code Action Provider
 	context.subscriptions.push(
 		vscode.languages.registerCodeActionsProvider(notebookSelector, new CleanImportProvider(), {
 			providedCodeActionKinds: CleanImportProvider.providedCodeActionKinds,
 		})
 	);
 
-	
-	// context.subscriptions.push(
-	// 	vscode.languages.registerCodeActionsProvider(notebookSelector, new SampleCodeActionProvider(), {
-	// 		providedCodeActionKinds: SampleCodeActionProvider.providedCodeActionKinds
-	// 	})
-	// );
+	// Cell Level Code Action Provider
+	context.subscriptions.push(
+		vscode.languages.registerCodeActionsProvider(notebookSelector, new SampleCodeActionProvider(), {
+			providedCodeActionKinds: SampleCodeActionProvider.providedCodeActionKinds
+		})
+	);
 	
 }
+/**
 
+ * Notebook Level Code Action Provider
+ * Takes all mentions of import "xx" and duplicates them to a new top code cell.
+ * todo: actually remove the imports from each cell...
+ */
 export class CleanImportProvider implements vscode.CodeActionProvider {
 	static readonly notebookKind = new vscode.CodeActionKind('notebook.cleanImports');
 
@@ -43,9 +45,6 @@ export class CleanImportProvider implements vscode.CodeActionProvider {
 		context: vscode.CodeActionContext,
 		_token: vscode.CancellationToken
 	): vscode.CodeAction[] | undefined {
-		// if(context.triggerKind !== vscode.CodeActionTriggerKind.Invoke){
-		// 	return;
-		// }		
 
 		let notebookDocument;
 		for (const nb of vscode.workspace.notebookDocuments) {
@@ -105,7 +104,8 @@ export class CleanImportProvider implements vscode.CodeActionProvider {
 }
 
 /**
- * Provides code actions adding panda import at beginning of cell(s)
+ * Cell Level Code Action Provider
+ * Provides code actions adding import pandas at beginning of cell(s)
  * Just a test platform, no good functionality
  */
 export class SampleCodeActionProvider implements vscode.CodeActionProvider {
@@ -124,7 +124,7 @@ export class SampleCodeActionProvider implements vscode.CodeActionProvider {
 			{
 				title: 'Fix Cell',
 				edit: edit,
-				kind: vscode.NotebookCodeActionKind.Notebook,
+				kind: vscode.CodeActionKind.SourceFixAll,
 			},
 		];
 	}
