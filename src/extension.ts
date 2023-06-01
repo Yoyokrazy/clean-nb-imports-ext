@@ -1,6 +1,11 @@
 /*---------------------------------------------------------
  * Copyright (C) Microsoft Corporation. All rights reserved.
- *--------------------------------------------------------*/
+ *--------------------------------------------------------*/ 
+
+/**
+ * Todo:
+ * - [ ] turn off if first code cell = top cell of document
+ */
 
 import * as vscode from 'vscode';
 
@@ -28,6 +33,8 @@ export function activate(context: vscode.ExtensionContext) {
 }
 /**
 
+/**
+
  * Notebook Level Code Action Provider
  * Takes all mentions of import "xx" and duplicates them to a new top code cell.
  * todo: actually remove the imports from each cell...
@@ -42,22 +49,19 @@ export class CleanImportProvider implements vscode.CodeActionProvider {
 	public provideCodeActions(
 		document: vscode.TextDocument,
 		_range: vscode.Range | vscode.Selection,
-		context: vscode.CodeActionContext,
+		_context: vscode.CodeActionContext,
 		_token: vscode.CancellationToken
-	): vscode.CodeAction[] | undefined {
+	): vscode.CodeAction[] | undefined {		
 
-		let notebookDocument;
-		for (const nb of vscode.workspace.notebookDocuments) {
-			if (nb.uri.path === document.uri.path) {
-				notebookDocument = nb;
-			}
-		}
+		const notebookDocument = this.getNotebookDocument(document);
 		if (!notebookDocument) {
 			return;
 		}
-
-		const fix = new vscode.CodeAction('Extract imports to new cell.', CleanImportProvider.notebookKind);
-		fix.edit = new vscode.WorkspaceEdit();
+		if(!this.isFirstCodeCell(document, notebookDocument)){
+			return;
+		}
+		
+		
 
 		const importStatements:vscode.TextLine[] = [];
 		for(const cell of notebookDocument.getCells()){
@@ -97,9 +101,99 @@ export class CleanImportProvider implements vscode.CodeActionProvider {
 			importText,
 			'python'
 		)];
+
 		const nbEdit = new vscode.NotebookEdit(new vscode.NotebookRange(0,0), importCell);
+
+		const fix = new vscode.CodeAction('Extract imports to new cell.', CleanImportProvider.notebookKind);
+		fix.edit = new vscode.WorkspaceEdit();
 		fix.edit.set(notebookDocument.uri, [nbEdit]);
 		return [fix];
+	}
+
+	private isFirstCodeCell(cellDocument: vscode.TextDocument, notebookDocument: vscode.NotebookDocument): boolean {
+		for(const iter of notebookDocument.getCells()){
+			// skip md cells
+			if(iter.kind !== vscode.NotebookCellKind.Code){
+				continue;
+			}
+
+			// check if parameter TextDocument represents the first code cell of the notebook
+			if(cellDocument.uri !== iter.document.uri){
+				return false;
+			} else {
+				break;
+			}
+		}
+		return true;
+	}
+
+	private getNotebookDocument(document: vscode.TextDocument): vscode.NotebookDocument | undefined {
+		for (const nb of vscode.workspace.notebookDocuments) {
+			if (nb.uri.path === document.uri.path) {
+				return nb;
+			}
+		}
+		return undefined;
+	}
+
+	private extractImportsAndCreateCellEdits(notebookDocument: vscode.NotebookDocument) {
+		const cellEdits:vscode.NotebookEdit[] = [];
+		const importStatements:vscode.TextLine[] = [];
+		
+		let importText = '';
+		let firstImport = true;
+		for(const cell of notebookDocument.getCells()){
+			if(cell.kind !== vscode.NotebookCellKind.Code){
+				continue;
+			}
+
+			let i = 0;
+			let f = true;
+			let line = cell.document.lineAt(i);
+			let nonImportText = '';
+			while(i < cell.document.lineCount){
+				if(line.text.startsWith('import ')){
+					if(importStatements.includes(line)){
+						continue;
+					}
+
+					importStatements.push(line);
+					if(firstImport){
+						importText += `${line.text}`;
+						firstImport = false;
+					} else{
+						importText += `\n${line.text}`;
+					}
+				} else {
+					if(f){
+						nonImportText += `${line.text}`;
+						f = false;
+					} else {
+						nonImportText += `\n${line.text}`;
+					}
+				}
+
+				try {
+					line = cell.document.lineAt(++i);
+				} catch {
+					break;
+				}
+			} // cell line iterator close
+
+			const newCell = [new vscode.NotebookCellData(
+				vscode.NotebookCellKind.Code,
+				nonImportText,
+				'python'
+			)];
+			const cellEdit = new vscode.NotebookEdit(new vscode.NotebookRange(cell.index,cell.index), newCell);
+			cellEdits.push(cellEdit);
+		} // notebook cell iterator close
+
+		return {
+			importStatements: importStatements,
+			cellEdits: cellEdits,
+			importText: importText,
+		};
 	}
 }
 
