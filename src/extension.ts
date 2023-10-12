@@ -1,20 +1,14 @@
 /*---------------------------------------------------------
  * Copyright (C) Microsoft Corporation. All rights reserved.
- *--------------------------------------------------------*/ 
-
-/**
- * Todo:
- * - [ ] turn off if first code cell = top cell of document
- */
+ *--------------------------------------------------------*/
 
 import * as vscode from 'vscode';
+import { CodeActionKind } from 'vscode';
 
 export function activate(context: vscode.ExtensionContext) {
 	const notebookSelector: vscode.DocumentSelector = {
-		scheme: 'vscode-notebook-cell',
-		language: 'python',
+		notebookType: 'jupyter-notebook',
 	};
-
 
 	// Notebook Level Code Action Provider
 	context.subscriptions.push(
@@ -25,175 +19,120 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Cell Level Code Action Provider
 	context.subscriptions.push(
-		vscode.languages.registerCodeActionsProvider(notebookSelector, new SampleCodeActionProvider(), {
-			providedCodeActionKinds: SampleCodeActionProvider.providedCodeActionKinds
-		})
+		vscode.languages.registerCodeActionsProvider(
+			notebookSelector,
+			new SampleCodeActionProvider(),
+			{
+				providedCodeActionKinds: SampleCodeActionProvider.providedCodeActionKinds,
+			}
+		)
 	);
-	
 }
-/**
 
 /**
-
  * Notebook Level Code Action Provider
- * Takes all mentions of import "xx" and duplicates them to a new top code cell.
- * todo: actually remove the imports from each cell...
+ * Takes all mentions of import "xx" and extracts them to a new top code cell.
  */
 export class CleanImportProvider implements vscode.CodeActionProvider {
-	static readonly notebookKind = new vscode.CodeActionKind('notebook.cleanImports');
+	static readonly cleanImportKind = CodeActionKind.Notebook.append(
+		CodeActionKind.Source.append('cleanImports').value
+	);
 
-	public static readonly providedCodeActionKinds = [
-		CleanImportProvider.notebookKind
-	];
+	public static readonly providedCodeActionKinds = [CleanImportProvider.cleanImportKind];
+
+	constructor() {
+		console.log('CREATED -- CleanImportProvider');
+	}
 
 	public provideCodeActions(
 		document: vscode.TextDocument,
 		_range: vscode.Range | vscode.Selection,
 		_context: vscode.CodeActionContext,
 		_token: vscode.CancellationToken
-	): vscode.CodeAction[] | undefined {		
+	): vscode.CodeAction[] | undefined {
+		// console.log(`PROVIDED -- ${document.uri}`);
 
 		const notebookDocument = this.getNotebookDocument(document);
 		if (!notebookDocument) {
 			return;
 		}
-		if(!this.isFirstCodeCell(document, notebookDocument)){
-			return;
-		}
-		
-		
 
-		const importStatements:vscode.TextLine[] = [];
-		for(const cell of notebookDocument.getCells()){
-			if(cell.kind !== vscode.NotebookCellKind.Code){
-				continue;
-			}
-			let i = 0;
-			let line = cell.document.lineAt(i);
-			while(i < cell.document.lineCount){
-				if(line.text.startsWith('import ')){
-					importStatements.push(line);
-				}
-				try {
-					line = cell.document.lineAt(++i);
-
-				} catch {
-					break;
-				}
-			}
-		}
-		if(!importStatements){
+		const edits = this.extractImportsAndCreateCellEdits(notebookDocument);
+		if (!edits) {
 			return;
 		}
 
-		let importText = '';
-		let first = true;
-		for(const imp of importStatements){
-			if(first){
-				importText += `${imp.text}`;
-				first = false;
-			} else {
-				importText += `\n${imp.text}`;
-			}
-		}
-		const importCell = [new vscode.NotebookCellData(
-			vscode.NotebookCellKind.Code,
-			importText,
-			'python'
-		)];
-
-		const nbEdit = new vscode.NotebookEdit(new vscode.NotebookRange(0,0), importCell);
-
-		const fix = new vscode.CodeAction('Extract imports to new cell.', CleanImportProvider.notebookKind);
+		const fix = new vscode.CodeAction(
+			'Extract imports to new cell.',
+			CleanImportProvider.cleanImportKind
+		);
 		fix.edit = new vscode.WorkspaceEdit();
-		fix.edit.set(notebookDocument.uri, [nbEdit]);
+		fix.edit.set(notebookDocument.uri, edits);
 		return [fix];
 	}
 
-	private isFirstCodeCell(cellDocument: vscode.TextDocument, notebookDocument: vscode.NotebookDocument): boolean {
-		for(const iter of notebookDocument.getCells()){
-			// skip md cells
-			if(iter.kind !== vscode.NotebookCellKind.Code){
+	private extractImportsAndCreateCellEdits(notebookDocument: vscode.NotebookDocument) {
+		const nbEdits: vscode.NotebookEdit[] = [];
+		const importStatements: vscode.TextLine[] = [];
+
+		for (const cell of notebookDocument.getCells()) {
+			if (cell.kind !== vscode.NotebookCellKind.Code) {
 				continue;
 			}
 
-			// check if parameter TextDocument represents the first code cell of the notebook
-			if(cellDocument.uri !== iter.document.uri){
-				return false;
-			} else {
-				break;
+			let i = 0;
+			let nonImportText = '';
+			while (i < cell.document.lineCount) {
+				const l = cell.document.lineAt(i);
+				if (l) {
+					if (l.text.startsWith('import') || l.text.startsWith('from')) {
+						if (!importStatements.includes(l)) {
+							importStatements.push(l);
+						}
+					} else {
+						nonImportText += l.text + '\n';
+					}
+				}
+				i++;
 			}
+
+			// create the edit to remove the imports from the cell
+			const newCell = new vscode.NotebookCellData(
+				vscode.NotebookCellKind.Code,
+				nonImportText,
+				'python'
+			);
+			nbEdits.push(
+				vscode.NotebookEdit.replaceCells(
+					new vscode.NotebookRange(cell.index, cell.index + 1),
+					[newCell]
+				)
+			);
 		}
-		return true;
+
+		if (!importStatements.length) {
+			return;
+		}
+
+		// create the edit to create a new top cell containing all imports
+		const newCell = new vscode.NotebookCellData(
+			vscode.NotebookCellKind.Code,
+			importStatements.map((l) => l.text).join('\n') + '\n',
+			'python'
+		);
+		nbEdits.push(new vscode.NotebookEdit(new vscode.NotebookRange(0, 0), [newCell]));
+		return nbEdits;
 	}
 
-	private getNotebookDocument(document: vscode.TextDocument): vscode.NotebookDocument | undefined {
+	private getNotebookDocument(
+		document: vscode.TextDocument
+	): vscode.NotebookDocument | undefined {
 		for (const nb of vscode.workspace.notebookDocuments) {
 			if (nb.uri.path === document.uri.path) {
 				return nb;
 			}
 		}
 		return undefined;
-	}
-
-	private extractImportsAndCreateCellEdits(notebookDocument: vscode.NotebookDocument) {
-		const cellEdits:vscode.NotebookEdit[] = [];
-		const importStatements:vscode.TextLine[] = [];
-		
-		let importText = '';
-		let firstImport = true;
-		for(const cell of notebookDocument.getCells()){
-			if(cell.kind !== vscode.NotebookCellKind.Code){
-				continue;
-			}
-
-			let i = 0;
-			let f = true;
-			let line = cell.document.lineAt(i);
-			let nonImportText = '';
-			while(i < cell.document.lineCount){
-				if(line.text.startsWith('import ')){
-					if(importStatements.includes(line)){
-						continue;
-					}
-
-					importStatements.push(line);
-					if(firstImport){
-						importText += `${line.text}`;
-						firstImport = false;
-					} else{
-						importText += `\n${line.text}`;
-					}
-				} else {
-					if(f){
-						nonImportText += `${line.text}`;
-						f = false;
-					} else {
-						nonImportText += `\n${line.text}`;
-					}
-				}
-
-				try {
-					line = cell.document.lineAt(++i);
-				} catch {
-					break;
-				}
-			} // cell line iterator close
-
-			const newCell = [new vscode.NotebookCellData(
-				vscode.NotebookCellKind.Code,
-				nonImportText,
-				'python'
-			)];
-			const cellEdit = new vscode.NotebookEdit(new vscode.NotebookRange(cell.index,cell.index), newCell);
-			cellEdits.push(cellEdit);
-		} // notebook cell iterator close
-
-		return {
-			importStatements: importStatements,
-			cellEdits: cellEdits,
-			importText: importText,
-		};
 	}
 }
 
@@ -207,9 +146,9 @@ export class SampleCodeActionProvider implements vscode.CodeActionProvider {
 
 	provideCodeActions(
 		document: vscode.TextDocument,
-		range: vscode.Range | vscode.Selection,
-		context: vscode.CodeActionContext,
-		token: vscode.CancellationToken
+		_range: vscode.Range | vscode.Selection,
+		_context: vscode.CodeActionContext,
+		_token: vscode.CancellationToken
 	): vscode.CodeAction[] {
 		const edit = new vscode.WorkspaceEdit();
 		edit.insert(document.uri, new vscode.Position(0, 0), 'import pandas as pd\n');
