@@ -2,13 +2,19 @@
  * Copyright (C) Microsoft Corporation. All rights reserved.
  *--------------------------------------------------------*/
 
+import path = require('path');
+import * as fs from 'fs';
 import * as vscode from 'vscode';
-import { CodeActionKind } from 'vscode';
+import { CodeActionKind, Disposable, Uri, env } from 'vscode';
+import { EXTENSION_ROOT_DIR } from './constants';
 
 export function activate(context: vscode.ExtensionContext) {
 	const notebookSelector: vscode.DocumentSelector = {
 		notebookType: 'jupyter-notebook',
 	};
+
+	// context.subscriptions.push(registerIssueUriRequestHandler());
+	context.subscriptions.push(registerIssueDataProvider());
 
 	// Notebook Level Code Action Provider
 	context.subscriptions.push(
@@ -161,4 +167,36 @@ export class SampleCodeActionProvider implements vscode.CodeActionProvider {
 			},
 		];
 	}
+}
+
+let stringMD = 'did not properly get markdown file';
+const templatePath = path.join(EXTENSION_ROOT_DIR, 'resources', 'report_issue_template.md');
+
+fs.readFile(templatePath, 'utf-8', (err, data) => {
+	if (err) {
+		console.error(`Error reading the file: ${err}`);
+	} else {
+		// The file content is now in the 'data' variable
+		stringMD = data;
+	}
+});
+
+function registerIssueUriRequestHandler(): Disposable {
+	return env.registerIssueUriRequestHandler({
+		handleIssueUrlRequest: () => Uri.parse('https://aka.ms/microsoft/vscode-copilot-release'),
+	});
+}
+
+function registerIssueDataProvider(): Disposable {
+	return env.registerIssueDataProvider({
+		provideIssueTemplate: () => {
+			return stringMD;
+		},
+		provideIssueData: async () => {
+			// You can change the timeout here to see the loading/error state.
+			await new Promise((resolve) => setTimeout(resolve, 2000));
+			return 'temp data here: add some data stuff, fill in with more stuff, whoooohooo';
+		},
+
+	});
 }
