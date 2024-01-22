@@ -42,11 +42,14 @@ function getData(): string {
 
 export async function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerCommand('extension.openIssueReporter', openIssueReporter));
+	
+	// Custom Code Action with new ranges property
 	class RangedCodeAction extends vscode.CodeAction {
-		// would most likely be provided by extension, by its code action edits or diagnostics
+		// Would most likely be provided by extension, by its code action edits or diagnostics
 		override readonly ranges = [new vscode.Range(3, 0, 3, 10), new vscode.Range(1, 0, 1, 10)];
 	}
 
+	// Code Action Provider
 	class OpenIssueReporterActionProvider implements vscode.CodeActionProvider {
 		static readonly providedCodeActionKinds = [
 			vscode.CodeActionKind.Refactor
@@ -56,7 +59,7 @@ export async function activate(context: vscode.ExtensionContext) {
 			const action = new RangedCodeAction('Open Issue Reporter', OpenIssueReporterActionProvider.providedCodeActionKinds[0]);
 			action.command = {
 				command: 'extension.openIssueReporter',
-				title: 'Open Issue Reporter',
+				title: 'Demo: Open Issue Reporter',
 			};
 			return [action];
 		}
@@ -66,9 +69,6 @@ export async function activate(context: vscode.ExtensionContext) {
 		providedCodeActionKinds: OpenIssueReporterActionProvider.providedCodeActionKinds
 	}));
 
-	// vscode.commands.registerCommand('custom.command.cleanNB', () => {
-	// 	openIssueReporter();
-	// });
 	const filePath = path.join(EXTENSION_ROOT_DIR, 'resources', 'foo.txt');
 
 	const notebookSelector: vscode.DocumentSelector = {
