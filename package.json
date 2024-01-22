@@ -1,6 +1,6 @@
 {
-	"name": "nb-codeactions",
-	"displayName": "nb_CodeActions",
+	"name": "reporter-command",
+	"displayName": "reporter-command",
 	"description": "Provide basic CodeActions for notebook context",
 	"version": "0.0.1",
 	"engines": {
@@ -13,6 +13,7 @@
 		"onStartupFinished"
 	],
 	"enabledApiProposals": [
+        "codeActionRanges",
 		"handleIssueUri"
 	],
 	"main": "./out/extension.js",

@@ -8,13 +8,75 @@ import * as vscode from 'vscode';
 import { CodeActionKind, Disposable, Uri, env } from 'vscode';
 import { EXTENSION_ROOT_DIR } from './constants';
 
-export function activate(context: vscode.ExtensionContext) {
+
+export function openIssueReporter() {
+	const template = getTemplate();
+	const data = getData();
+
+	// TODO: add a command to open the issue reporter
+	vscode.commands.executeCommand('workbench.action.openIssueReporter', {
+		extensionId: 'ms-python.python',
+		issueTitle: 'title here',
+		body: 'body here',
+		command: {
+			template: template,
+			data: data,
+			uri: Uri.parse('https://github.com/microsoft/vscode-copilot-release').toString(),
+		}
+	});
+}
+
+function getTemplate(): string {
+	const templatePath = path.join(EXTENSION_ROOT_DIR, 'resources', 'report_issue_template.md');
+	try {
+		const data = fs.readFileSync(templatePath, 'utf-8');
+		return data;
+	} catch (err) {
+		throw new Error(`Error reading the file: ${err}`);
+	}
+}
+function getData(): string {
+	return 'temp data here: add some data stuff, fill in with more stuff, whoooohooo';
+}
+
+
+export async function activate(context: vscode.ExtensionContext) {
+	context.subscriptions.push(vscode.commands.registerCommand('extension.openIssueReporter', openIssueReporter));
+	class RangedCodeAction extends vscode.CodeAction {
+		// would most likely be provided by extension, by its code action edits or diagnostics
+		override readonly ranges = [new vscode.Range(3, 0, 3, 10), new vscode.Range(1, 0, 1, 10)];
+	}
+
+	class OpenIssueReporterActionProvider implements vscode.CodeActionProvider {
+		static readonly providedCodeActionKinds = [
+			vscode.CodeActionKind.Refactor
+		];
+
+		provideCodeActions(document: vscode.TextDocument, range: vscode.Range | vscode.Selection, context: vscode.CodeActionContext, token: vscode.CancellationToken): vscode.ProviderResult<vscode.CodeAction[]> {
+			const action = new RangedCodeAction('Open Issue Reporter', OpenIssueReporterActionProvider.providedCodeActionKinds[0]);
+			action.command = {
+				command: 'extension.openIssueReporter',
+				title: 'Open Issue Reporter',
+			};
+			return [action];
+		}
+	}
+
+	context.subscriptions.push(vscode.languages.registerCodeActionsProvider({ scheme: 'file' }, new OpenIssueReporterActionProvider(), {
+		providedCodeActionKinds: OpenIssueReporterActionProvider.providedCodeActionKinds
+	}));
+
+	// vscode.commands.registerCommand('custom.command.cleanNB', () => {
+	// 	openIssueReporter();
+	// });
+	const filePath = path.join(EXTENSION_ROOT_DIR, 'resources', 'foo.txt');
+
 	const notebookSelector: vscode.DocumentSelector = {
 		notebookType: 'jupyter-notebook',
 	};
 
 	// context.subscriptions.push(registerIssueUriRequestHandler());
-	context.subscriptions.push(registerIssueDataProvider());
+	// context.subscriptions.push(registerIssueDataProvider());
 
 	// Notebook Level Code Action Provider
 	context.subscriptions.push(
@@ -181,22 +243,24 @@ fs.readFile(templatePath, 'utf-8', (err, data) => {
 	}
 });
 
-function registerIssueUriRequestHandler(): Disposable {
-	return env.registerIssueUriRequestHandler({
-		handleIssueUrlRequest: () => Uri.parse('https://aka.ms/microsoft/vscode-copilot-release'),
-	});
-}
+// function registerIssueUriRequestHandler(): Disposable {
+// 	return env.registerIssueUriRequestHandler({
+// 		handleIssueUrlRequest: () => Uri.parse('https://github.com/microsoft/vscode-copilot-release'),
+// 	});
+// }
 
-function registerIssueDataProvider(): Disposable {
-	return env.registerIssueDataProvider({
-		provideIssueTemplate: () => {
-			return stringMD;
-		},
-		provideIssueData: async () => {
-			// You can change the timeout here to see the loading/error state.
-			await new Promise((resolve) => setTimeout(resolve, 2000));
-			return 'temp data here: add some data stuff, fill in with more stuff, whoooohooo';
-		},
+// function registerIssueDataProvider(): Disposable {
+// 	return env.registerIssueDataProvider({
+// 		provideIssueTemplate: () => {
+// 			return stringMD;
+// 			;
+// 		},
+// 		provideIssueData: async () => {
+// 			// You can change the timeout here to see the loading/error state.
+// 			await new Promise((resolve) => setTimeout(resolve, 2000));
+// 			return 'temp data here: add some data stuff, fill in with more stuff, whoooohooo';
+// 		},
 
-	});
-}
+// 	});
+// }
+
