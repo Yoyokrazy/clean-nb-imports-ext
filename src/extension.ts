@@ -45,7 +45,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	// Custom Code Action with new ranges property
 	class RangedCodeAction extends vscode.CodeAction {
 		// Would most likely be provided by extension, by its code action edits or diagnostics
-		override readonly ranges = [new vscode.Range(3, 0, 3, 10), new vscode.Range(1, 0, 1, 10)];
+		override readonly ranges = [new vscode.Range(4, 0, 4, 10), new vscode.Range(1, 0, 1, 10)];
 	}
 
 	// Code Action Provider
