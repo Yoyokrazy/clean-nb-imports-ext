@@ -17,10 +17,9 @@ export function openIssueReporter() {
 	vscode.commands.executeCommand('workbench.action.openIssueReporter', {
 		extensionId: 'ms-python.python',
 		issueTitle: 'title here',
-		body: 'body here',
 		command: {
 			template: template,
-			data: data,
+			// data: data,
 			uri: Uri.parse('https://github.com/microsoft/vscode-copilot-release').toString(),
 		}
 	});
@@ -42,7 +41,7 @@ function getData(): string {
 
 export async function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerCommand('extension.openIssueReporter', openIssueReporter));
-	
+
 	// Custom Code Action with new ranges property
 	class RangedCodeAction extends vscode.CodeAction {
 		// Would most likely be provided by extension, by its code action edits or diagnostics
