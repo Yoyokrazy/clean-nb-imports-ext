@@ -8,20 +8,16 @@ import * as vscode from 'vscode';
 import { CodeActionKind, Disposable, Uri, env } from 'vscode';
 import { EXTENSION_ROOT_DIR } from './constants';
 
-
 export function openIssueReporter() {
 	const template = getTemplate();
 	const data = getData();
 
-	// TODO: add a command to open the issue reporter
 	vscode.commands.executeCommand('workbench.action.openIssueReporter', {
 		extensionId: 'ms-python.python',
 		issueTitle: 'title here',
-		command: {
-			template: template,
-			// data: data,
-			uri: Uri.parse('https://github.com/microsoft/vscode-copilot-release').toString(),
-		}
+		issueBody: template,
+		data: data,
+		uri: Uri.parse('https://github.com/microsoft/vscode-copilot-release'),
 	});
 }
 
@@ -35,17 +31,36 @@ function getTemplate(): string {
 	}
 }
 function getData(): string {
-	return 'temp data here: add some data stuff, fill in with more stuff, whoooohooo';
+	return 'x'.repeat(1000);
 }
 
+async function openIssueReporter2() {
+	await vscode.commands.executeCommand('workbench.action.openIssueReporter', {
+		extensionId: 'undefined_publisher.reporter-command-sample',
+		issueBody: 'got a new template here very pog very champ',
+		data: 'data should be here and it is good and also great',
+		uri: Uri.parse('https://github.com/microsoft/vscode-copilot-release'),
+	});
+}
 
 export async function activate(context: vscode.ExtensionContext) {
+	// For regular open reporter command.
 	context.subscriptions.push(vscode.commands.registerCommand('extension.openIssueReporter', openIssueReporter));
+
+	let disposable = vscode.commands.registerCommand('extension.myCommand', async () => {
+		// Example: if we await a timeout, simulating data collection that takes some time
+		// await new Promise(resolve => setTimeout(resolve, 4000));
+		openIssueReporter2();
+	});
+	context.subscriptions.push(disposable);
+
+
 
 	// Custom Code Action with new ranges property
 	class RangedCodeAction extends vscode.CodeAction {
 		// Would most likely be provided by extension, by its code action edits or diagnostics
-		override readonly ranges = [new vscode.Range(3, 0, 3, 10), new vscode.Range(1, 0, 1, 10)];
+		override readonly ranges = [new vscode.Range(4, 0, 4, 10), new vscode.Range(1, 0, 1, 10)];
+		override readonly diagnostics = [new vscode.Diagnostic(new vscode.Range(1, 0, 1, 10), 'Error', vscode.DiagnosticSeverity.Error), new vscode.Diagnostic(new vscode.Range(6, 0, 6, 10), 'Error', vscode.DiagnosticSeverity.Error)];
 	}
 
 	// Code Action Provider
@@ -55,7 +70,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		];
 
 		provideCodeActions(document: vscode.TextDocument, range: vscode.Range | vscode.Selection, context: vscode.CodeActionContext, token: vscode.CancellationToken): vscode.ProviderResult<vscode.CodeAction[]> {
-			const action = new RangedCodeAction('Open Issue Reporter', OpenIssueReporterActionProvider.providedCodeActionKinds[0]);
+			const action = new RangedCodeAction('Open Issue Reporter: Python', OpenIssueReporterActionProvider.providedCodeActionKinds[0]);
 			action.command = {
 				command: 'extension.openIssueReporter',
 				title: 'Demo: Open Issue Reporter',
@@ -73,9 +88,6 @@ export async function activate(context: vscode.ExtensionContext) {
 	const notebookSelector: vscode.DocumentSelector = {
 		notebookType: 'jupyter-notebook',
 	};
-
-	// context.subscriptions.push(registerIssueUriRequestHandler());
-	// context.subscriptions.push(registerIssueDataProvider());
 
 	// Notebook Level Code Action Provider
 	context.subscriptions.push(
