@@ -1,6 +1,6 @@
 {
-	"name": "reporter-command",
-	"displayName": "reporter-command",
+	"name": "reporter-command-sample",
+	"displayName": "reporter-command-sample",
 	"description": "Provide basic CodeActions for notebook context",
 	"version": "0.0.1",
 	"engines": {
@@ -14,11 +14,24 @@
 	],
 	"enabledApiProposals": [
         "codeActionRanges",
-		"handleIssueUri"
-	],
+		"handleIssueUri",
+        "contribIssueReporter"
+],
 	"main": "./out/extension.js",
 	"contributes": {
-		"commands": []
+		"commands": [
+			{
+				"command": "extension.myCommand",
+				"title": "Report Issue"
+			}
+		],
+		"menus": {
+			"issue/reporter": [
+				{
+					"command": "extension.myCommand"
+				}
+			]
+		}
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
